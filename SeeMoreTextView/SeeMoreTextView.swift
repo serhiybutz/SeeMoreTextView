@@ -7,41 +7,98 @@
 //  MIT license, see LICENSE file for details
 //
 
+#if os(iOS)
+import UIKit
+public typealias TextView = UITextView
+public typealias Color = UIColor
+public typealias Font = UIFont
+#elseif os(macOS)
 import AppKit
+public typealias TextView = NSTextView
+public typealias Color = NSColor
+public typealias Font = NSFont
+#endif
 
-open class SeeMoreTextView: NSTextView {
+open class SeeMoreTextView: TextView {
     // MARK: - Constants
 
+    #if os(iOS)
+    static let defaultFont = UIFont(name: "Helvetica", size: 12)!
+    #elseif os(macOS)
     static let defaultFont = NSFontManager.shared.font(withFamily: "Helvetica",
                                                        traits: [],
                                                        weight: 5,
                                                        size: 12)!
+    #endif
+
     static let bufferLen = 1024
 
     // MARK: - State
 
-    let ellipsisString: NSMutableAttributedString = .init(
-        string: "…  ",
-        attributes: [.font: NSFontManager.shared.font(
-                        withFamily: "Helvetica",
-                        traits: [],
-                        weight: 5,
-                        size: 10)!])
+    var txtStorage: NSTextStorage {
+        #if os(iOS)
+        return textStorage
+        #elseif os(macOS)
+        return textStorage!
+        #endif
+    }
+
+    var txtContainer: NSTextContainer {
+        #if os(iOS)
+        return textContainer
+        #elseif os(macOS)
+        return textContainer!
+        #endif
+    }
+
+    var lytManager: NSLayoutManager {
+        #if os(iOS)
+        return layoutManager
+        #elseif os(macOS)
+        return layoutManager!
+        #endif
+    }
+
+    lazy var ellipsisString: NSMutableAttributedString = {
+        #if os(iOS)
+        let ellipsisFont = Font(descriptor: SeeMoreTextView.defaultFont.fontDescriptor.withSymbolicTraits([.traitBold])!, size: 0)
+        #elseif os(macOS)
+        let ellipsisFont = NSFontManager.shared.font(
+            withFamily: "Helvetica",
+            traits: [],
+            weight: 5,
+            size: 10)!
+        #endif
+
+        return NSMutableAttributedString(
+            string: "…  ",
+            attributes: [.font: ellipsisFont])
+    }()
 
     /// See More label's text.
-    public var seeMoreString: NSMutableAttributedString = .init(
-        string: "See More",
-        attributes: [.font: NSFontManager.shared.font(
-                        withFamily: "Helvetica",
-                        traits: [],
-                        weight: 10,
-                        size: 10)!])
+    public var seeMoreString: NSMutableAttributedString = {
+        #if os(iOS)
+        let seeMoreFont = Font(descriptor: SeeMoreTextView.defaultFont.fontDescriptor.withSymbolicTraits([.traitBold])!, size: 0)
+        #elseif os(macOS)
+        let seeMoreFont = NSFontManager.shared.font(
+            withFamily: "Helvetica",
+            traits: [],
+            weight: 5,
+            size: 10)!
+        #endif
 
+        return NSMutableAttributedString(
+            string: "See More",
+            attributes: [.font: seeMoreFont])
+    }()
+
+    #if os(macOS)
     var seeMoreTextHighlighted: Bool = false {
         didSet {
             updateSeeMoreTextHighlighting()
         }
     }
+    #endif
 
     var isExpanded: Bool = false
 
@@ -54,9 +111,9 @@ open class SeeMoreTextView: NSTextView {
 
     /// See More label's text as attributed string.
     open var contents: NSAttributedString {
-        get { textStorage! }
+        get { txtStorage }
         set {
-            textStorage!.setAttributedString(newValue)
+            txtStorage.setAttributedString(newValue)
             relayout()
         }
     }
@@ -73,15 +130,22 @@ open class SeeMoreTextView: NSTextView {
 
     // MARK: - Initialization
 
+    #if os(iOS)
+    public override init(frame: CGRect, textContainer: NSTextContainer?) {
+        super.init(frame: frame, textContainer: textContainer)
+        setup()
+    }
+    #elseif os(macOS)
     public override init(frame: CGRect) {
         super.init(frame: frame)
         setup()
     }
 
-    override public init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+    override public init(frame frameRect: CGRect, textContainer container: NSTextContainer?) {
         super.init(frame: frameRect, textContainer: container)
         setup()
     }
+    #endif
 
     public required init?(coder: NSCoder) {
         super.init(coder: coder)
@@ -89,20 +153,37 @@ open class SeeMoreTextView: NSTextView {
     }
 
     func setup() {
-        layoutManager!.delegate = self
-        layoutManager!.allowsNonContiguousLayout = true
+        lytManager.delegate = self
+        lytManager.allowsNonContiguousLayout = true
 
-        textContainer!.maximumNumberOfLines = 0
-        textContainer!.lineBreakMode = .byClipping
-        textContainer!.lineFragmentPadding = 5
-        textContainer!.widthTracksTextView = true
+        txtContainer.maximumNumberOfLines = 0
+        txtContainer.lineBreakMode = .byClipping
+        txtContainer.lineFragmentPadding = 5
+
+        txtContainer.widthTracksTextView = true
+
+        #if os(iOS)
+        contentMode = .redraw
+
+        let tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(tapRecognized(_:)))
+        tapRecognizer.delegate = self
+        addGestureRecognizer(tapRecognizer)
+        #endif
 
         backgroundColor = .clear
     }
 
     // MARK: - Life Cycle
 
-    open override func setFrameSize(_ newSize: NSSize) {
+    #if os(iOS)
+    open override var bounds: CGRect {
+        didSet {
+            guard oldValue.size != bounds.size else { return; }
+            relayout()
+        }
+    }
+    #elseif os(macOS)
+    open override func setFrameSize(_ newSize: CGSize) {
         let changed = bounds.size != newSize
 
         super.setFrameSize(newSize)
@@ -111,8 +192,9 @@ open class SeeMoreTextView: NSTextView {
             relayout()
         }
     }
+    #endif
 
-    open override func draw(_ dirtyRect: NSRect) {
+    open override func draw(_ dirtyRect: CGRect) {
         super.draw(dirtyRect)
         if let seeMoreLabelRect = self.seeMoreLabelRect {
             ellipsisString.draw(at: ellipsisRect!.origin)
@@ -126,6 +208,18 @@ open class SeeMoreTextView: NSTextView {
 
     // MARK: - Mouse handling
 
+    #if os(iOS)
+    @objc func tapRecognized(_ recognizer: UIGestureRecognizer) {
+        if !isExpanded, let seeMoreLabelRect = seeMoreLabelRect {
+            let point = recognizer.location(in: self)
+            if seeMoreLabelRect.contains(point) {
+                isExpanded = true
+                relayout()
+                return
+            }
+        }
+    }
+    #elseif os(macOS)
     open override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
         handleMouse(with: event)
@@ -165,7 +259,16 @@ open class SeeMoreTextView: NSTextView {
         }
         super.mouseDown(with: event)
     }
+    #endif
 }
+
+#if os(iOS)
+extension SeeMoreTextView: UIGestureRecognizerDelegate {
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
+    }
+}
+#endif
 
 // MARK: - NSLayoutManagerDelegate
 extension SeeMoreTextView: NSLayoutManagerDelegate {
@@ -174,7 +277,7 @@ extension SeeMoreTextView: NSLayoutManagerDelegate {
         shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
         properties props: UnsafePointer<NSLayoutManager.GlyphProperty>,
         characterIndexes charIndexes: UnsafePointer<Int>,
-        font aFont: NSFont,
+        font aFont: Font,
         forGlyphRange glyphRange: NSRange) -> Int
     {
         let firstCharIndex = charIndexes[0]
@@ -277,7 +380,11 @@ extension SeeMoreTextView {
     func relayout() {
         prepare()
         invalidateIntrinsicContentSize()
+        #if os(iOS)
+        layoutIfNeeded()
+        #elseif os(macOS)
         layoutSubtreeIfNeeded()
+        #endif
     }
 
     // Computes seeMoreLocation and height.
@@ -287,7 +394,7 @@ extension SeeMoreTextView {
 
         seeMoreLabelRect = nil
 
-        guard textStorage!.length > 0 else { return; }
+        guard txtStorage.length > 0 else { return; }
 
         // Layout full text representation.
 
@@ -303,9 +410,9 @@ extension SeeMoreTextView {
         var prevLineFragmentRect: CGRect?
         var prevLineFragmentGlyphRange: NSRange?
 
-        let wholeGlyphRange = layoutManager!.glyphRange(for: textContainer!)
+        let wholeGlyphRange = lytManager.glyphRange(for: txtContainer)
 
-        layoutManager!.enumerateLineFragments(forGlyphRange: wholeGlyphRange) {
+        lytManager.enumerateLineFragments(forGlyphRange: wholeGlyphRange) {
             lineFragmentRect,
             _,
             textContainer,
@@ -330,7 +437,12 @@ extension SeeMoreTextView {
             self.height = lineFragmentRect.maxY - firstLineFragmentRect!.minY
         }
 
+        #if os(iOS)
+        height += textContainerInset.top + textContainerInset.bottom
+        #elseif os(macOS)
         height += textContainerOrigin.y
+        #endif
+
         onHeightChange?(self)
 
         guard !isExpanded else { return; }
@@ -343,13 +455,13 @@ extension SeeMoreTextView {
 
             let ellipsisAndSeeMoreLabelBoundingRect = CGRect(
                 origin: CGPoint(
-                    x: max(ellipsisLineFragmentRect.maxX - sz.width - textContainer!.lineFragmentPadding, 0),
+                    x: max(ellipsisLineFragmentRect.maxX - sz.width - txtContainer.lineFragmentPadding, 0),
                     y: ellipsisLineFragmentRect.origin.y),
                 size: sz)
 
             var runningSeeMoreLocation: Int?
             for index in ellipsisLineFragmentGlyphRange.location..<ellipsisLineFragmentGlyphRange.maxLocation {
-                let runningRect = self.layoutManager!.boundingRect(forGlyphRange: NSMakeRange(index, 1), in: textContainer!)
+                let runningRect = self.lytManager.boundingRect(forGlyphRange: NSMakeRange(index, 1), in: txtContainer)
 
                 if ellipsisAndSeeMoreLabelBoundingRect.contains(CGPoint(
                     x: runningRect.maxX,
@@ -357,7 +469,7 @@ extension SeeMoreTextView {
                     break
                 }
 
-                runningSeeMoreLocation = layoutManager!.characterIndexForGlyph(at: index)
+                runningSeeMoreLocation = lytManager.characterIndexForGlyph(at: index)
             }
             seeMoreLocation = runningSeeMoreLocation ?? ellipsisLineFragmentGlyphRange.location
 
@@ -370,10 +482,10 @@ extension SeeMoreTextView {
 
     func relayoutText() {
         // Invalidate glyph mappings
-        layoutManager!.invalidateGlyphs(forCharacterRange: textStorage!.wholeRange, changeInLength: 0, actualCharacterRange: nil)
-        layoutManager!.invalidateLayout(forCharacterRange: textStorage!.wholeRange, actualCharacterRange: nil)  // must follow `invalidateGlyphs`
+        lytManager.invalidateGlyphs(forCharacterRange: txtStorage.wholeRange, changeInLength: 0, actualCharacterRange: nil)
+        lytManager.invalidateLayout(forCharacterRange: txtStorage.wholeRange, actualCharacterRange: nil)  // must follow `invalidateGlyphs`
         // Relayout
-        layoutManager!.ensureLayout(forCharacterRange: textStorage!.wholeRange)
+        lytManager.ensureLayout(forCharacterRange: txtStorage.wholeRange)
     }
 
     // Having ellipsis char location calculates ellipsis & See More label rects.
@@ -385,38 +497,45 @@ extension SeeMoreTextView {
         }
 
         // Get See More label's line fragment bounding rect.
-        let lineFragmentBoundingRect = layoutManager!.lineFragmentRect(
-            forGlyphAt: layoutManager!.glyphIndexForCharacter(at: seeMoreLocation),
+        let lineFragmentBoundingRect = lytManager.lineFragmentRect(
+            forGlyphAt: lytManager.glyphIndexForCharacter(at: seeMoreLocation),
             effectiveRange: nil)
 
         // Get text attributes.
-        let textFont = textStorage!.attribute(.font, at: seeMoreLocation, effectiveRange: nil)
-            as! NSFont// ?? SeeMoreTextView.defaultFont
+        let textFont = txtStorage.attribute(.font, at: seeMoreLocation, effectiveRange: nil)
+            as! Font// ?? SeeMoreTextView.defaultFont
 
         // Get SeeMore placement glyph rect.
-        let seeMorePlacementGlyphRect = layoutManager!.boundingRect(
-            forGlyphRange: NSMakeRange(layoutManager!.glyphIndexForCharacter(at: seeMoreLocation), 1),
-            in: textContainer!)
+        let seeMorePlacementGlyphRect = lytManager.boundingRect(
+            forGlyphRange: NSMakeRange(lytManager.glyphIndexForCharacter(at: seeMoreLocation), 1),
+            in: txtContainer)
 
         // Get ellipsis font.
         let ellipsisTextFont = ellipsisString.attribute(.font, at: 0, effectiveRange: nil)
-            as? NSFont ?? SeeMoreTextView.defaultFont
+            as? Font ?? SeeMoreTextView.defaultFont
 
         // Get ellipsis rect.
         let ellipsisStringSize = ellipsisString.size()
+        #if os(iOS)
+        let originX = textContainerInset.left
+        let originY = textContainerInset.top
+        #elseif os(macOS)
+        let originX = textContainerOrigin.x
+        let originY = textContainerOrigin.y
+        #endif
         ellipsisRect = CGRect(
             origin: CGPoint(
-                x: seeMorePlacementGlyphRect.minX + textContainerOrigin.x,
+                x: seeMorePlacementGlyphRect.minX + originX,
                 y: lineFragmentBoundingRect.minY
                     + lineFragmentBoundingRect.height - ellipsisStringSize.height
                     + textFont.descender - ellipsisTextFont.descender
-                    + textContainerOrigin.y),
+                    + originY),
             size: ellipsisStringSize
         )
 
         // Get SeeMore label font.
         let seeMoreTextFont = seeMoreString.attribute(.font, at: 0, effectiveRange: nil)
-            as? NSFont ?? SeeMoreTextView.defaultFont
+            as? Font ?? SeeMoreTextView.defaultFont
 
         // Get SeeMore label rect.
         let seeMoreStringSize = seeMoreString.size()
@@ -426,7 +545,7 @@ extension SeeMoreTextView {
                 y: lineFragmentBoundingRect.minY
                     + lineFragmentBoundingRect.height - seeMoreStringSize.height
                     + textFont.descender - seeMoreTextFont.descender
-                    + textContainerOrigin.y),
+                    + originY),
             size: seeMoreStringSize)
     }
 
@@ -438,13 +557,15 @@ extension SeeMoreTextView {
             height: max(ellipsisStringSize.height, seeMoreStringSize.height))
     }
 
+    #if os(macOS)
     func updateSeeMoreTextHighlighting() {
         if seeMoreTextHighlighted {
             seeMoreString.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: seeMoreString.wholeRange)
-            seeMoreString.addAttribute(.backgroundColor, value: NSColor(red: 0.96, green: 0.96, blue: 0.96, alpha: 1.00), range: seeMoreString.wholeRange)
+            seeMoreString.addAttribute(.backgroundColor, value: Color(red: 0.96, green: 0.96, blue: 0.96, alpha: 1.00), range: seeMoreString.wholeRange)
         } else {
             seeMoreString.removeAttribute(.underlineStyle, range: seeMoreString.wholeRange)
             seeMoreString.removeAttribute(.backgroundColor, range: seeMoreString.wholeRange)
         }
     }
+    #endif
 }
