@@ -1,6 +1,6 @@
 <p align="center">
     <img src="https://img.shields.io/badge/Swift-4.2-orange" alt="Swift" />
-    <img src="https://img.shields.io/badge/platform-osx-orange" alt="Platform" />
+    <img src="https://img.shields.io/badge/platform-osx|ios-orange" alt="Platform" />
     <img src="https://img.shields.io/badge/pod-compatible-orange" alt="CocoaPods" />
     <a href="https://github.com/SergeBouts/SeeMoreTextView/blob/master/LICENSE">
         <img src="https://img.shields.io/badge/licence-MIT-orange" alt="License" />
