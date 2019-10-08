@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
   spec.name         = 'SeeMoreTextView'
-  spec.version      = '2.0.0'
+  spec.version      = '3.0.0'
   spec.summary      = 'Text view with an expandable See More link'
   spec.homepage     = 'https://github.com/SergeBouts/SeeMoreTextView'
   spec.screenshots  = "#{spec.homepage}/blob/master/screenshot.gif"
@@ -10,5 +10,5 @@ Pod::Spec.new do |spec|
   spec.ios.deployment_target = '12.0'
   spec.swift_version = '4.2'
   spec.source        = { :git => "#{spec.homepage}.git", :tag => "#{spec.version}" }
-  spec.source_files  = 'SeeMoreTextView/**/*.swift'
+  spec.source_files  = 'Sources/SeeMoreTextView/**/*.swift'
 end
