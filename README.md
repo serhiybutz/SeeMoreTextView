@@ -10,7 +10,7 @@
 
 # SeeMoreTextView
 
-**NSTextView** subclass with an expandable **See More** link. It helps avoid cluttering with too much information, by hiding some of it, allowing users to choose whether to display the hidden information. The hidden information is displayed by clicking on the **See More** link.
+**NSTextView/UITextView** subclass with an expandable **See More** link. It helps avoid cluttering with too much information, by hiding some of it, allowing users to choose whether to display the hidden information. The hidden information is displayed by clicking on the **See More** link.
 
 ![](screenshot.gif)
 
@@ -65,6 +65,21 @@ override func viewWillAppear() {
 ```
 
 ## Installation
+
+### Swift Package as dependency in Xcode 11+
+
+1. Go to "File" -> "Swift Packages" -> "Add Package Dependency"
+2. Paste Themer repository URL into the search field:
+
+`https://github.com/SergeBouts/SeeMoreTextView.git`
+
+3. Click "Next"
+
+4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 3.0.0"
+
+5. Click "Next" to finish
+
+For more info, check out [here](https://developer.apple.com/documentation/xcode/adding_package_dependencies_to_your_app).
 
 ### CocoaPods
 
