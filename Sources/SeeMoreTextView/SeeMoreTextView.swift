@@ -66,7 +66,7 @@ open class SeeMoreTextView: TextView {
         let ellipsisFont = NSFontManager.shared.font(
             withFamily: "Helvetica",
             traits: [],
-            weight: 5,
+            weight: 10,
             size: 10)!
         #endif
 
@@ -83,7 +83,7 @@ open class SeeMoreTextView: TextView {
         let seeMoreFont = NSFontManager.shared.font(
             withFamily: "Helvetica",
             traits: [],
-            weight: 5,
+            weight: 10,
             size: 10)!
         #endif
 
@@ -128,6 +128,11 @@ open class SeeMoreTextView: TextView {
     /// Custom handler of text view's height change event.
     public var onHeightChange: ((SeeMoreTextView) -> Void)?
 
+    #if os(macOS)
+    var mouseHoverMonitor: Any?
+    var mouseClickMonitor: Any?
+    #endif
+
     // MARK: - Initialization
 
     #if os(iOS)
@@ -162,15 +167,24 @@ open class SeeMoreTextView: TextView {
 
         txtContainer.widthTracksTextView = true
 
+        isEditable = false
+        backgroundColor = .clear
+
         #if os(iOS)
         contentMode = .redraw
 
         let tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(tapRecognized(_:)))
         tapRecognizer.delegate = self
         addGestureRecognizer(tapRecognizer)
+        #elseif os(macOS)
+        addMouseMonitors()
         #endif
+    }
 
-        backgroundColor = .clear
+    deinit {
+        #if os(macOS)
+        removeMouseMonitors()
+        #endif
     }
 
     // MARK: - Life Cycle
@@ -220,22 +234,7 @@ open class SeeMoreTextView: TextView {
         }
     }
     #elseif os(macOS)
-    open override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        handleMouse(with: event)
-    }
-
-    open override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        handleMouse(with: event)
-    }
-
-    open override func mouseMoved(with event: NSEvent) {
-        super.mouseMoved(with: event)
-        handleMouse(with: event)
-    }
-
-    func handleMouse(with event: NSEvent) {
+    func handleMouseHover(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         if let seeMoreLabelRect = seeMoreLabelRect {
             if NSPointInRect(point, seeMoreLabelRect) {
@@ -248,16 +247,17 @@ open class SeeMoreTextView: TextView {
         }
     }
 
-    open override func mouseDown(with event: NSEvent) {
+    func handleMouseClick(with event: NSEvent) -> Bool {
         if !isExpanded, let seeMoreLabelRect = seeMoreLabelRect {
             let point = convert(event.locationInWindow, from: nil)
             if NSPointInRect(point, seeMoreLabelRect) {
+                removeMouseMonitors()
                 isExpanded = true
                 relayout()
-                return
+                return true
             }
         }
-        super.mouseDown(with: event)
+        return false
     }
     #endif
 }
@@ -565,6 +565,38 @@ extension SeeMoreTextView {
         } else {
             seeMoreString.removeAttribute(.underlineStyle, range: seeMoreString.wholeRange)
             seeMoreString.removeAttribute(.backgroundColor, range: seeMoreString.wholeRange)
+        }
+    }
+    #endif
+
+    #if os(macOS)
+    func addMouseMonitors() {
+        mouseHoverMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .mouseExited, .mouseEntered],
+            handler: { event -> NSEvent? in
+                self.handleMouseHover(with: event)
+                return event
+            }
+        )
+
+        mouseClickMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: .leftMouseDown,
+            handler: { event -> NSEvent? in
+                if self.handleMouseClick(with: event) {
+                    return nil
+                }
+                return event
+            }
+        )
+    }
+    func removeMouseMonitors() {
+        if mouseHoverMonitor != nil {
+            NSEvent.removeMonitor(mouseHoverMonitor!)
+            mouseHoverMonitor = nil
+        }
+        if mouseClickMonitor != nil {
+            NSEvent.removeMonitor(mouseClickMonitor!)
+            mouseClickMonitor = nil
         }
     }
     #endif
