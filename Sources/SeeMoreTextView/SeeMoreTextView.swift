@@ -280,13 +280,7 @@ extension SeeMoreTextView: NSLayoutManagerDelegate {
         font aFont: Font,
         forGlyphRange glyphRange: NSRange) -> Int
     {
-        let firstCharIndex = charIndexes[0]
-        let lastCharIndex = charIndexes[glyphRange.length - 1]
-        let charactersRange = NSRange(location: firstCharIndex, length: lastCharIndex - firstCharIndex + 1)
-
         guard let seeMoreLocation = self.seeMoreLocation else { return 0 }
-
-        guard NSLocationInRange(seeMoreLocation, charactersRange) else { return 0 }
 
         let glyphBufferPointer = UnsafeMutablePointer<CGGlyph>.allocate(capacity: SeeMoreTextView.bufferLen)
         defer {
@@ -298,6 +292,7 @@ extension SeeMoreTextView: NSLayoutManagerDelegate {
             propBufferPointer.deallocate()
         }
 
+        var hasChanged = false
         var runningGlyphRange = NSRange()
         var index = 0
         while index < glyphRange.length {
@@ -334,6 +329,7 @@ extension SeeMoreTextView: NSLayoutManagerDelegate {
                     propBufferPointer[runningGlyphRange.length] = .null
                 }
                 runningGlyphRange.length += 1
+                hasChanged = true
             }
             index += 1
         }
@@ -348,7 +344,7 @@ extension SeeMoreTextView: NSLayoutManagerDelegate {
                 forGlyphRange: NSMakeRange(glyphRange.location + runningGlyphRange.location, runningGlyphRange.length))
         }
 
-        return glyphRange.length
+        return hasChanged ? glyphRange.length : 0
     }
 
     public func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction, forControlCharacterAt charIndex: Int) -> NSLayoutManager.ControlCharacterAction {
@@ -380,11 +376,6 @@ extension SeeMoreTextView {
     func relayout() {
         prepare()
         invalidateIntrinsicContentSize()
-        #if os(iOS)
-        layoutIfNeeded()
-        #elseif os(macOS)
-        layoutSubtreeIfNeeded()
-        #endif
     }
 
     // Computes seeMoreLocation and height.
@@ -403,7 +394,7 @@ extension SeeMoreTextView {
         // Determine ellipsis & see more label's line fragment.
 
         var ellipsisLineFragmentRect: CGRect?
-        var ellipsisLineFragmentGlyphRange: NSRange?
+        var ellipsisLineFragmentCharRange: NSRange?
 
         var line: Int = 0
         var firstLineFragmentRect: CGRect?
@@ -423,7 +414,9 @@ extension SeeMoreTextView {
                 if prevLineFragmentRect.maxY <= lineFragmentRect.minY {
                     if !self.isExpanded && (line == self.collapsedLineCount - 1) {
                         ellipsisLineFragmentRect = prevLineFragmentRect
-                        ellipsisLineFragmentGlyphRange = prevLineFragmentGlyphRange!
+                        ellipsisLineFragmentCharRange = self.lytManager.characterRange(
+                            forGlyphRange: prevLineFragmentGlyphRange!,
+                            actualGlyphRange: nil)
 
                         stop.pointee = true
                         return;
@@ -449,29 +442,31 @@ extension SeeMoreTextView {
 
         // Determine `seeMoreLocation` within its line fragment.
         if let ellipsisLineFragmentRect = ellipsisLineFragmentRect,
-           let ellipsisLineFragmentGlyphRange = ellipsisLineFragmentGlyphRange
+           let ellipsisLineFragmentCharRange = ellipsisLineFragmentCharRange
         {
             let sz = self.ellipsisAndSeeMoreLabelBoundingSize
 
             let ellipsisAndSeeMoreLabelBoundingRect = CGRect(
                 origin: CGPoint(
-                    x: max(ellipsisLineFragmentRect.maxX - sz.width - txtContainer.lineFragmentPadding, 0),
+                    x: max(ellipsisLineFragmentRect.maxX - (sz.width + txtContainer.lineFragmentPadding), 0),
                     y: ellipsisLineFragmentRect.origin.y),
                 size: sz)
 
             var runningSeeMoreLocation: Int?
-            for index in ellipsisLineFragmentGlyphRange.location..<ellipsisLineFragmentGlyphRange.maxLocation {
-                let runningRect = self.lytManager.boundingRect(forGlyphRange: NSMakeRange(index, 1), in: txtContainer)
-
-                if ellipsisAndSeeMoreLabelBoundingRect.contains(CGPoint(
-                    x: runningRect.maxX,
-                    y: runningRect.minY)) {
-                    break
+            (txtStorage.string as NSString).enumerateSubstrings(
+                in: ellipsisLineFragmentCharRange,
+                options: .byComposedCharacterSequences)
+            { _, charRange, _, stop in
+                let runningGlyphRange = self.lytManager.glyphRange(
+                    forCharacterRange: charRange,
+                    actualCharacterRange: nil)
+                let runningRect = self.lytManager.boundingRect(forGlyphRange: runningGlyphRange, in: self.txtContainer)
+                if ellipsisAndSeeMoreLabelBoundingRect.intersects(runningRect) {
+                    stop.pointee = true
                 }
-
-                runningSeeMoreLocation = lytManager.characterIndexForGlyph(at: index)
+                runningSeeMoreLocation = charRange.location
             }
-            seeMoreLocation = runningSeeMoreLocation ?? ellipsisLineFragmentGlyphRange.location
+            seeMoreLocation = runningSeeMoreLocation ?? ellipsisLineFragmentCharRange.location
 
             // Ensure ellipsis character & see more label injection
             // and update layout
