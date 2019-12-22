@@ -75,7 +75,7 @@ override func viewWillAppear() {
 
 3. Click "Next"
 
-4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 3.0.0"
+4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 3.0.4"
 
 5. Click "Next" to finish
 

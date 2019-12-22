@@ -106,6 +106,8 @@ open class SeeMoreTextView: TextView {
     var ellipsisRect: CGRect?
     var seeMoreLabelRect: CGRect?
 
+    var baselineOffsetCache: [(NSRange, CGFloat)] = []
+
     /// Text view's height in the current state.
     public var height: CGFloat = 0
 
@@ -272,6 +274,16 @@ extension SeeMoreTextView: UIGestureRecognizerDelegate {
 
 // MARK: - NSLayoutManagerDelegate
 extension SeeMoreTextView: NSLayoutManagerDelegate {
+    public func layoutManagerDidInvalidateLayout(_ sender: NSLayoutManager) {
+        baselineOffsetCache = []
+    }
+
+    public func layoutManager(_ layoutManager: NSLayoutManager, shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<CGRect>, lineFragmentUsedRect: UnsafeMutablePointer<CGRect>, baselineOffset: UnsafeMutablePointer<CGFloat>, in textContainer: NSTextContainer, forGlyphRange glyphRange: NSRange) -> Bool {
+        let charRange = lytManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        baselineOffsetCache.append((charRange, baselineOffset.pointee))
+        return false
+    }
+
     public func layoutManager(
         _ layoutManager: NSLayoutManager,
         shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
@@ -491,14 +503,12 @@ extension SeeMoreTextView {
             return;
         }
 
+        let baselineOffset = baselineOffsetCache.first(where: { $0.0.contains(seeMoreLocation) })!.1
+
         // Get See More label's line fragment bounding rect.
         let lineFragmentBoundingRect = lytManager.lineFragmentRect(
             forGlyphAt: lytManager.glyphIndexForCharacter(at: seeMoreLocation),
             effectiveRange: nil)
-
-        // Get text attributes.
-        let textFont = txtStorage.attribute(.font, at: seeMoreLocation, effectiveRange: nil)
-            as! Font// ?? SeeMoreTextView.defaultFont
 
         // Get SeeMore placement glyph rect.
         let seeMorePlacementGlyphRect = lytManager.boundingRect(
@@ -509,37 +519,40 @@ extension SeeMoreTextView {
         let ellipsisTextFont = ellipsisString.attribute(.font, at: 0, effectiveRange: nil)
             as? Font ?? SeeMoreTextView.defaultFont
 
+        // Get SeeMore label font.
+        let seeMoreTextFont = seeMoreString.attribute(.font, at: 0, effectiveRange: nil)
+            as? Font ?? SeeMoreTextView.defaultFont
+
         // Get ellipsis rect.
         let ellipsisStringSize = ellipsisString.size()
         #if os(iOS)
         let originX = textContainerInset.left
         let originY = textContainerInset.top
+        let ellipsisTextFontAscender = ellipsisTextFont.ascender
+        let seeMoreTextFontAscender = seeMoreTextFont.ascender
         #elseif os(macOS)
         let originX = textContainerOrigin.x
         let originY = textContainerOrigin.y
+        let ellipsisTextFontAscender = ellipsisTextFont.ascender - ellipsisTextFont.descender // (!) determined experimentally
+        let seeMoreTextFontAscender = seeMoreTextFont.ascender - seeMoreTextFont.descender // (!) determined experimentally
         #endif
         ellipsisRect = CGRect(
             origin: CGPoint(
                 x: seeMorePlacementGlyphRect.minX + originX,
                 y: lineFragmentBoundingRect.minY
-                    + lineFragmentBoundingRect.height - ellipsisStringSize.height
-                    + textFont.descender - ellipsisTextFont.descender
+                    + baselineOffset
+                    - ellipsisTextFontAscender
                     + originY),
-            size: ellipsisStringSize
-        )
-
-        // Get SeeMore label font.
-        let seeMoreTextFont = seeMoreString.attribute(.font, at: 0, effectiveRange: nil)
-            as? Font ?? SeeMoreTextView.defaultFont
+            size: ellipsisStringSize)
 
         // Get SeeMore label rect.
         let seeMoreStringSize = seeMoreString.size()
         seeMoreLabelRect = CGRect(
             origin: CGPoint(
-                x: ellipsisRect!.maxX,
+                x: ellipsisRect!.maxX + originX,
                 y: lineFragmentBoundingRect.minY
-                    + lineFragmentBoundingRect.height - seeMoreStringSize.height
-                    + textFont.descender - seeMoreTextFont.descender
+                    + baselineOffset
+                    - seeMoreTextFontAscender
                     + originY),
             size: seeMoreStringSize)
     }
