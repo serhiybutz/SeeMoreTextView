@@ -32,7 +32,7 @@ override func viewWillAppear() {
     seeMoreTextView = SeeMoreTextView(frame: .zero)
     seeMoreTextView.translatesAutoresizingMaskIntoConstraints = false
     
-    let scrollView = NSScrollView()
+    let scrollView = CustomScrollView()
     view.addSubview(scrollView)
     scrollView.translatesAutoresizingMaskIntoConstraints = false
     scrollView.borderType = .noBorder
@@ -41,9 +41,10 @@ override func viewWillAppear() {
     scrollView.documentView = seeMoreTextView
     
     scrollViewHeightConstraint = scrollView.heightAnchor.constraint(equalToConstant: 0)
-
+    // See more text view's height change hook, which can be used for custom layout handling
     seeMoreTextView.onHeightChange = { sender in
         self.scrollViewHeightConstraint.constant = min(sender.height, 100)
+        (sender.enclosingScrollView as! CustomScrollView).isEnabled = sender.isExpanded
     }
     
     NSLayoutConstraint.activate([
@@ -62,6 +63,18 @@ override func viewWillAppear() {
     // Number of lines to display in collapsed state
     seeMoreTextView.collapsedLineCount = 2
 }
+
+// NSScrollView subclass disabling scrolling on demand
+class CustomScrollView: NSScrollView {
+    var isEnabled = false
+    override func scrollWheel(with event: NSEvent) {
+        if isEnabled {
+            super.scrollWheel(with: event)
+        } else {
+            nextResponder?.scrollWheel(with: event)
+        }
+    }
+}
 ```
 
 ## Installation
@@ -75,7 +88,7 @@ override func viewWillAppear() {
 
 3. Click "Next"
 
-4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 3.0.4"
+4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 3.0.6"
 
 5. Click "Next" to finish
 

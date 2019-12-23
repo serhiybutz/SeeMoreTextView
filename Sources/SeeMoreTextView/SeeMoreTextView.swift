@@ -101,7 +101,10 @@ open class SeeMoreTextView: TextView {
     #endif
 
     /// Indicates whether See More text view is in expanded or collapsed state.
-    public var isExpanded: Bool = false
+    public var isExpanded: Bool {
+        isSeeMoreActivated || seeMoreLocation == nil
+    }
+    var isSeeMoreActivated: Bool = false
 
     var seeMoreLocation: Int?
     var ellipsisRect: CGRect?
@@ -135,6 +138,8 @@ open class SeeMoreTextView: TextView {
     var mouseHoverMonitor: Any?
     var mouseClickMonitor: Any?
     #endif
+
+    var isBoundsChangeRelayoutDisabled: Bool = false
 
     // MARK: - Initialization
 
@@ -196,7 +201,9 @@ open class SeeMoreTextView: TextView {
     open override var bounds: CGRect {
         didSet {
             guard oldValue.size != bounds.size else { return; }
-            relayout()
+            if !isBoundsChangeRelayoutDisabled {
+                relayout()
+            }
         }
     }
     #elseif os(macOS)
@@ -206,7 +213,9 @@ open class SeeMoreTextView: TextView {
         super.setFrameSize(newSize)
 
         if changed {
-            relayout()
+            if !isBoundsChangeRelayoutDisabled {
+                relayout()
+            }
         }
     }
     #endif
@@ -230,9 +239,9 @@ open class SeeMoreTextView: TextView {
         if !isExpanded, let seeMoreLabelRect = seeMoreLabelRect {
             let point = recognizer.location(in: self)
             if seeMoreLabelRect.contains(point) {
-                isExpanded = true
+                isSeeMoreActivated = true
                 relayout()
-                return
+                return;
             }
         }
     }
@@ -255,7 +264,7 @@ open class SeeMoreTextView: TextView {
             let point = convert(event.locationInWindow, from: nil)
             if NSPointInRect(point, seeMoreLabelRect) {
                 removeMouseMonitors()
-                isExpanded = true
+                isSeeMoreActivated = true
                 relayout()
                 return true
             }
@@ -393,6 +402,11 @@ extension SeeMoreTextView {
 
     // Computes seeMoreLocation and height.
     func prepare() {
+        defer {
+            updateCollapsedFrameHeight()
+            onHeightChange?(self)
+        }
+
         seeMoreLocation = nil
         height = 0
 
@@ -425,7 +439,7 @@ extension SeeMoreTextView {
 
             if let prevLineFragmentRect = prevLineFragmentRect {
                 if prevLineFragmentRect.maxY <= lineFragmentRect.minY {
-                    if !self.isExpanded && (line == self.collapsedLineCount - 1) {
+                    if !self.isSeeMoreActivated && (line == self.collapsedLineCount - 1) {
                         ellipsisLineFragmentRect = prevLineFragmentRect
                         ellipsisLineFragmentCharRange = self.lytManager.characterRange(
                             forGlyphRange: prevLineFragmentGlyphRange!,
@@ -449,14 +463,12 @@ extension SeeMoreTextView {
         height += textContainerOrigin.y
         #endif
 
-        onHeightChange?(self)
-
-        guard !isExpanded else { return; }
-
         // Determine `seeMoreLocation` within its line fragment.
         if let ellipsisLineFragmentRect = ellipsisLineFragmentRect,
            let ellipsisLineFragmentCharRange = ellipsisLineFragmentCharRange
         {
+            guard !isSeeMoreActivated else { return; }
+
             let sz = self.ellipsisAndSeeMoreLabelBoundingSize
 
             let ellipsisAndSeeMoreLabelBoundingRect = CGRect(
@@ -494,6 +506,28 @@ extension SeeMoreTextView {
         lytManager.invalidateLayout(forCharacterRange: txtStorage.wholeRange, actualCharacterRange: nil)  // must follow `invalidateGlyphs`
         // Relayout
         lytManager.ensureLayout(forCharacterRange: txtStorage.wholeRange)
+    }
+
+    // Ensure text view height matches contents in collapsed state
+    func updateCollapsedFrameHeight() {
+        guard !isExpanded else { return; }
+        guard frame.size.height != height else { return; }
+        var newFrameSize = frame.size
+        newFrameSize.height = height
+        isBoundsChangeRelayoutDisabled = true  // avoid possible recursion loop in `setFrameSize`
+        #if os(iOS)
+        frame.size = newFrameSize
+        #elseif os(macOS)
+        setFrameSize(newFrameSize)
+        #endif
+        isBoundsChangeRelayoutDisabled = false
+
+        #if os(iOS)
+        // Disable scrolling
+        if !isExpanded {
+            contentSize.height = 1
+        }
+        #endif
     }
 
     // Having ellipsis char location calculates ellipsis & See More label rects.
