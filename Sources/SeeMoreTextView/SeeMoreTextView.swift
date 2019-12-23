@@ -100,7 +100,8 @@ open class SeeMoreTextView: TextView {
     }
     #endif
 
-    var isExpanded: Bool = false
+    /// Indicates whether See More text view is in expanded or collapsed state.
+    public var isExpanded: Bool = false
 
     var seeMoreLocation: Int?
     var ellipsisRect: CGRect?
