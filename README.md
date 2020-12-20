@@ -82,7 +82,7 @@ class CustomScrollView: NSScrollView {
 ### Swift Package as dependency in Xcode 11+
 
 1. Go to "File" -> "Swift Packages" -> "Add Package Dependency"
-2. Paste Themer repository URL into the search field:
+2. Paste SeeMoreTextView repository URL into the search field:
 
 `https://github.com/SergeBouts/SeeMoreTextView.git`
 
