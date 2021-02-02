@@ -88,7 +88,7 @@ open class SeeMoreTextView: TextView {
         #endif
 
         return NSMutableAttributedString(
-            string: "See More",
+            string: NSLocalizedString("See_More", bundle: .module, comment: ""),
             attributes: [.font: seeMoreFont])
     }()
 
