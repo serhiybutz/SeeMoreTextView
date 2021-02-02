@@ -279,6 +279,15 @@ open class SeeMoreTextView: TextView {
         }
         return false
     }
+
+    open override func viewDidChangeEffectiveAppearance() {
+        let oldAppearance = NSAppearance.current
+        NSAppearance.current = effectiveAppearance
+
+        updateAccessoriesForegroundColor()
+
+        NSAppearance.current = oldAppearance
+    }
     #endif
 }
 
@@ -612,7 +621,7 @@ extension SeeMoreTextView {
     func updateSeeMoreTextHighlighting() {
         if seeMoreTextHighlighted {
             seeMoreString.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: seeMoreString.wholeRange)
-            seeMoreString.addAttribute(.backgroundColor, value: Color(red: 0.96, green: 0.96, blue: 0.96, alpha: 1.00), range: seeMoreString.wholeRange)
+            seeMoreString.addAttribute(.backgroundColor, value: Color.tertiaryLabelColor, range: seeMoreString.wholeRange)
         } else {
             seeMoreString.removeAttribute(.underlineStyle, range: seeMoreString.wholeRange)
             seeMoreString.removeAttribute(.backgroundColor, range: seeMoreString.wholeRange)
@@ -648,6 +657,16 @@ extension SeeMoreTextView {
         if mouseClickMonitor != nil {
             NSEvent.removeMonitor(mouseClickMonitor!)
             mouseClickMonitor = nil
+        }
+    }
+    func updateAccessoriesForegroundColor() {
+        if let textColor = textColor {
+            [ellipsisString,
+             seeMoreString].forEach {
+                $0.addAttribute(.foregroundColor,
+                                value: textColor,
+                                range: $0.wholeRange)
+             }
         }
     }
     #endif
