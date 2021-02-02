@@ -130,6 +130,27 @@ open class SeeMoreTextView: TextView {
         }
     }
 
+    #if os(macOS)
+    /// See More label's text as plain string.
+    open override var string: String {
+        get { txtStorage.string }
+        set {
+            txtStorage.setAttributedString(
+                NSAttributedString(string: newValue,
+                                   attributes: [.foregroundColor: textColor ?? .black]))
+            relayout()
+        }
+    }
+
+    open override var textColor: NSColor? {
+        get { super.textColor }
+        set {
+            super.textColor = newValue
+            updateAccessoriesForegroundColor()
+        }
+    }
+    #endif
+
     /// Lines to display in collapsed state.
     open var collapsedLineCount: Int = 1 {
         didSet {
