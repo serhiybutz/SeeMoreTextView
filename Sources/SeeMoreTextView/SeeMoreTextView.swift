@@ -104,7 +104,13 @@ open class SeeMoreTextView: TextView {
     public var isExpanded: Bool {
         isSeeMoreActivated || seeMoreLocation == nil
     }
-    var isSeeMoreActivated: Bool = false
+    public var isSeeMoreActivated: Bool = false {
+        didSet {
+            if !oldValue && isSeeMoreActivated {
+                onSeeMoreActivation?(self)
+            }
+        }
+    }
 
     var seeMoreLocation: Int?
     var ellipsisRect: CGRect?
@@ -133,6 +139,8 @@ open class SeeMoreTextView: TextView {
 
     /// Custom handler of text view's height change event.
     public var onHeightChange: ((SeeMoreTextView) -> Void)?
+
+    public var onSeeMoreActivation: ((SeeMoreTextView) -> Void)?
 
     #if os(macOS)
     var mouseHoverMonitor: Any?
