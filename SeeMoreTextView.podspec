@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
   spec.name         = 'SeeMoreTextView'
-  spec.version      = '4.0.0'
+  spec.version      = '4.0.1'
   spec.summary      = 'Text view with an expandable See More link'
   spec.homepage     = 'https://github.com/SergeBouts/SeeMoreTextView'
   spec.screenshots  = "#{spec.homepage}/blob/master/screenshot.gif"

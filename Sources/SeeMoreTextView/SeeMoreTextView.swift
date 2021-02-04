@@ -642,7 +642,11 @@ extension SeeMoreTextView {
     func updateSeeMoreTextHighlighting() {
         if seeMoreTextHighlighted {
             seeMoreString.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: seeMoreString.wholeRange)
-            seeMoreString.addAttribute(.backgroundColor, value: Color.tertiaryLabelColor, range: seeMoreString.wholeRange)
+            if #available(OSX 10.14, *) {
+                seeMoreString.addAttribute(.backgroundColor, value: NSColor.textBackgroundColor.withSystemEffect(.rollover), range: seeMoreString.wholeRange)
+            } else {
+                seeMoreString.addAttribute(.backgroundColor, value: Color.tertiaryLabelColor, range: seeMoreString.wholeRange)
+            }
         } else {
             seeMoreString.removeAttribute(.underlineStyle, range: seeMoreString.wholeRange)
             seeMoreString.removeAttribute(.backgroundColor, range: seeMoreString.wholeRange)
