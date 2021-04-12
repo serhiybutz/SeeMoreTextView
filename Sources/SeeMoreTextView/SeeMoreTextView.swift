@@ -302,6 +302,10 @@ open class SeeMoreTextView: TextView {
     }
 
     open override func viewDidChangeEffectiveAppearance() {
+        if #available(OSX 10.14, *) {
+            super.viewDidChangeEffectiveAppearance()
+        }
+
         let oldAppearance = NSAppearance.current
         NSAppearance.current = effectiveAppearance
 
