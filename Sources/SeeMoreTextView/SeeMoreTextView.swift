@@ -650,6 +650,7 @@ extension SeeMoreTextView {
         mouseHoverMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.mouseMoved, .mouseExited, .mouseEntered],
             handler: { event -> NSEvent? in
+                guard event.window == self.window else { return event }
                 self.handleMouseHover(with: event)
                 return event
             }
@@ -658,6 +659,7 @@ extension SeeMoreTextView {
         mouseClickMonitor = NSEvent.addLocalMonitorForEvents(
             matching: .leftMouseDown,
             handler: { event -> NSEvent? in
+                guard event.window == self.window else { return event }
                 if self.handleMouseClick(with: event) {
                     return nil
                 }
