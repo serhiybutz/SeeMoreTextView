@@ -112,14 +112,21 @@ open class SeeMoreTextView: TextView {
         }
     }
 
-    var seeMoreLocation: Int?
+    /// See More label's character index.
+    var seeMoreLocation: Int? {
+        didSet {
+            guard seeMoreLocation != oldValue else { return }
+            if seeMoreLocation == nil { seeMoreLabelRect = nil }
+            onVisibleCharactersRangeChange?(self)
+        }
+    }
     var ellipsisRect: CGRect?
     var seeMoreLabelRect: CGRect?
 
     var baselineOffsetCache: [(NSRange, CGFloat)] = []
 
     /// Text view's height in the current state.
-    public var height: CGFloat = 0
+    public var height: CGFloat = 14
 
     /// See More label's text as attributed string.
     open var contents: NSAttributedString {
@@ -142,14 +149,27 @@ open class SeeMoreTextView: TextView {
         }
     }
 
+    /// Text color.
     open override var textColor: NSColor? {
         get { super.textColor }
         set {
             super.textColor = newValue
-            updateAccessoriesForegroundColor()
+            updateSeeMoreForegroundColor()
+        }
+    }
+
+    /// See More label color.
+    open var seeMoreColor: NSColor? {
+        didSet {
+            updateSeeMoreForegroundColor()
         }
     }
     #endif
+
+    /// Visible characters range.
+    public var visibleRange: NSRange {
+        NSRange(location: 0, length: seeMoreLocation ?? txtStorage.length)
+    }
 
     /// Lines to display in collapsed state.
     open var collapsedLineCount: Int = 1 {
@@ -158,10 +178,14 @@ open class SeeMoreTextView: TextView {
         }
     }
 
-    /// Custom handler of text view's height change event.
+    /// Custom handler on text view's height change event.
     public var onHeightChange: ((SeeMoreTextView) -> Void)?
 
+    /// Custom handler on See More label activation event.
     public var onSeeMoreActivation: ((SeeMoreTextView) -> Void)?
+
+    /// Custom handler on visible characters range change event.
+    public var onVisibleCharactersRangeChange: ((SeeMoreTextView) -> Void)?
 
     #if os(macOS)
     var mouseHoverMonitor: Any?
@@ -259,6 +283,20 @@ open class SeeMoreTextView: TextView {
 
     open override var intrinsicContentSize: CGSize {
         return CGSize(width: bounds.width, height: height)
+    }
+
+    // MARK: - Methods
+
+    /// Forces re-layouting.
+    public func relayout() {
+        prepare()
+        invalidateIntrinsicContentSize()
+    }
+
+    /// Returns bounded by `maxLines` text length (in UTF16 code units) and used text height.
+    public func getTextMetrics(forMaxLines maxLines: Int) -> (length: Int, height: CGFloat)? {
+        guard let(_, charRange, height) = getLastLineFragment(for: maxLines) else { return nil }
+        return (length: charRange.location + charRange.length, height: height)
     }
 
     // MARK: - Mouse handling
@@ -424,22 +462,25 @@ extension SeeMoreTextView: NSLayoutManagerDelegate {
 
 // MARK: - Helpers
 extension SeeMoreTextView {
-    func relayout() {
-        prepare()
-        invalidateIntrinsicContentSize()
-    }
-
     // Computes seeMoreLocation and height.
     func prepare() {
         defer {
-            updateCollapsedFrameHeight()
+            #if os(iOS)
+            height += textContainerInset.top + textContainerInset.bottom
+            #elseif os(macOS)
+            height += textContainerOrigin.y + 1 // 1 - magic number
+            #endif
+
+            updateFrameHeight()
             onHeightChange?(self)
         }
 
         seeMoreLocation = nil
-        height = 0
-
-        seeMoreLabelRect = nil
+        #if os(iOS)
+        height = attributedText.size().height
+        #elseif os(macOS)
+        height = attributedString().size().height
+        #endif
 
         guard txtStorage.length > 0 else { return; }
 
@@ -449,84 +490,45 @@ extension SeeMoreTextView {
 
         // Determine ellipsis & see more label's line fragment.
 
-        var ellipsisLineFragmentRect: CGRect?
-        var ellipsisLineFragmentCharRange: NSRange?
+        let maxLineCount = isSeeMoreActivated ? 10_000 : collapsedLineCount
+        guard let(ellipsisLineFragmentRect, ellipsisLineFragmentCharRange, height) = getLastLineFragment(for: maxLineCount)
+        else { return; }
 
-        var line: Int = 0
-        var firstLineFragmentRect: CGRect?
-        var prevLineFragmentRect: CGRect?
-        var prevLineFragmentGlyphRange: NSRange?
+        self.height = height
 
-        let wholeGlyphRange = lytManager.glyphRange(for: txtContainer)
-
-        lytManager.enumerateLineFragments(forGlyphRange: wholeGlyphRange) {
-            lineFragmentRect,
-            _,
-            textContainer,
-            glyphRange,
-            stop in
-
-            if let prevLineFragmentRect = prevLineFragmentRect {
-                if prevLineFragmentRect.maxY <= lineFragmentRect.minY {
-                    if !self.isSeeMoreActivated && (line == self.collapsedLineCount - 1) {
-                        ellipsisLineFragmentRect = prevLineFragmentRect
-                        ellipsisLineFragmentCharRange = self.lytManager.characterRange(
-                            forGlyphRange: prevLineFragmentGlyphRange!,
-                            actualGlyphRange: nil)
-
-                        stop.pointee = true
-                        return;
-                    }
-                    line += 1
-                }
-            }
-            prevLineFragmentRect = lineFragmentRect
-            prevLineFragmentGlyphRange = glyphRange
-            if firstLineFragmentRect == nil { firstLineFragmentRect = lineFragmentRect }
-            self.height = lineFragmentRect.maxY - firstLineFragmentRect!.minY
-        }
-
-        #if os(iOS)
-        height += textContainerInset.top + textContainerInset.bottom
-        #elseif os(macOS)
-        height += textContainerOrigin.y
-        #endif
+        // No See More label if all lines have fitted
+        guard ellipsisLineFragmentCharRange.location + ellipsisLineFragmentCharRange.length < txtStorage.string.count else { return; }
 
         // Determine `seeMoreLocation` within its line fragment.
-        if let ellipsisLineFragmentRect = ellipsisLineFragmentRect,
-           let ellipsisLineFragmentCharRange = ellipsisLineFragmentCharRange
-        {
-            guard !isSeeMoreActivated else { return; }
 
-            let sz = self.ellipsisAndSeeMoreLabelBoundingSize
+        let sz = self.ellipsisAndSeeMoreLabelBoundingSize
 
-            let ellipsisAndSeeMoreLabelBoundingRect = CGRect(
-                origin: CGPoint(
-                    x: max(ellipsisLineFragmentRect.maxX - (sz.width + txtContainer.lineFragmentPadding), 0),
-                    y: ellipsisLineFragmentRect.origin.y),
-                size: sz)
+        let ellipsisAndSeeMoreLabelBoundingRect = CGRect(
+            origin: CGPoint(
+                x: max(ellipsisLineFragmentRect.maxX - (sz.width + txtContainer.lineFragmentPadding), 0),
+                y: ellipsisLineFragmentRect.origin.y),
+            size: sz)
 
-            var runningSeeMoreLocation: Int?
-            (txtStorage.string as NSString).enumerateSubstrings(
-                in: ellipsisLineFragmentCharRange,
-                options: .byComposedCharacterSequences)
-            { _, charRange, _, stop in
-                let runningGlyphRange = self.lytManager.glyphRange(
-                    forCharacterRange: charRange,
-                    actualCharacterRange: nil)
-                let runningRect = self.lytManager.boundingRect(forGlyphRange: runningGlyphRange, in: self.txtContainer)
-                if ellipsisAndSeeMoreLabelBoundingRect.intersects(runningRect) {
-                    stop.pointee = true
-                }
-                runningSeeMoreLocation = charRange.location
+        var runningSeeMoreLocation: Int?
+        (txtStorage.string as NSString).enumerateSubstrings(
+            in: ellipsisLineFragmentCharRange,
+            options: .byComposedCharacterSequences)
+        { _, charRange, _, stop in
+            let runningGlyphRange = self.lytManager.glyphRange(
+                forCharacterRange: charRange,
+                actualCharacterRange: nil)
+            let runningRect = self.lytManager.boundingRect(forGlyphRange: runningGlyphRange, in: self.txtContainer)
+            if ellipsisAndSeeMoreLabelBoundingRect.intersects(runningRect) {
+                stop.pointee = true
             }
-            seeMoreLocation = runningSeeMoreLocation ?? ellipsisLineFragmentCharRange.location
-
-            // Ensure ellipsis character & see more label injection
-            // and update layout
-            relayoutText()
-            updateEllipsisAndSeeMoreLabelRects()
+            runningSeeMoreLocation = charRange.location
         }
+        seeMoreLocation = runningSeeMoreLocation ?? ellipsisLineFragmentCharRange.location
+
+        // Ensure ellipsis character & see more label injection
+        // and update layout
+        relayoutText()
+        updateEllipsisAndSeeMoreLabelRects()
     }
 
     func relayoutText() {
@@ -537,9 +539,8 @@ extension SeeMoreTextView {
         lytManager.ensureLayout(forCharacterRange: txtStorage.wholeRange)
     }
 
-    // Ensure text view height matches contents in collapsed state
-    func updateCollapsedFrameHeight() {
-        guard !isExpanded else { return; }
+    // Ensures text view's height match the contents
+    func updateFrameHeight() {
         guard frame.size.height != height else { return; }
         var newFrameSize = frame.size
         newFrameSize.height = height
@@ -677,15 +678,61 @@ extension SeeMoreTextView {
             mouseClickMonitor = nil
         }
     }
-    func updateAccessoriesForegroundColor() {
-        if let textColor = textColor {
-            [ellipsisString,
-             seeMoreString].forEach {
-                $0.addAttribute(.foregroundColor,
-                                value: textColor,
-                                range: $0.wholeRange)
-             }
-        }
+    func updateSeeMoreForegroundColor() {
+        let seeMoreColor = seeMoreColor ?? textColor ?? NSColor.textColor
+        [ellipsisString,
+         seeMoreString].forEach {
+            $0.addAttribute(.foregroundColor,
+                            value: seeMoreColor,
+                            range: $0.wholeRange)
+         }
     }
     #endif
+
+    func getLastLineFragment(for maxLines: Int) -> (rect: CGRect, charRange: NSRange, height: CGFloat)? {
+        guard txtStorage.length > 0 else { return nil }
+
+        var line: Int = 0
+        var firstLineFragmentRect: CGRect?
+        var prevLineFragmentRect: CGRect?
+        var prevLineFragmentGlyphRange: NSRange?
+
+        let wholeGlyphRange = lytManager.glyphRange(for: txtContainer)
+
+        lytManager.enumerateLineFragments(forGlyphRange: wholeGlyphRange) {
+            lineFragmentRect,
+            _,
+            textContainer,
+            glyphRange,
+            stop in
+
+            if let prevLineFragmentRect = prevLineFragmentRect {
+                let newLineTriggerred = prevLineFragmentRect.maxY <= lineFragmentRect.minY
+                if newLineTriggerred {
+                    if line >= maxLines - 1 {
+                        stop.pointee = true
+                        return
+                    }
+                    line += 1
+                }
+            }
+
+            firstLineFragmentRect = firstLineFragmentRect ?? lineFragmentRect
+
+            prevLineFragmentRect = lineFragmentRect
+            prevLineFragmentGlyphRange = glyphRange
+        }
+
+        guard let rect = prevLineFragmentRect,
+              let glyphRange = prevLineFragmentGlyphRange
+        else { return nil }
+
+        let charRange = lytManager.characterRange(
+            forGlyphRange: glyphRange,
+            actualGlyphRange: nil)
+
+        let height = rect.maxY - firstLineFragmentRect!.minY
+
+        return (rect: rect, charRange: charRange, height: height)
+    }
 }

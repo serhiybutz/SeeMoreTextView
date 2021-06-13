@@ -88,7 +88,7 @@ class CustomScrollView: NSScrollView {
 
 3. Click "Next"
 
-4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 3.0.6"
+4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 4.1.0"
 
 5. Click "Next" to finish
 
