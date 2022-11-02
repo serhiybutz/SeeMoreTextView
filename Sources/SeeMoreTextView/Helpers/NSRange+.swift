@@ -2,8 +2,8 @@
 //  NSRange+.swift
 //  SeeMoreTextView
 //
-//  Created by Serge Bouts on 05/24/19.
-//  Copyright © Serge Bouts 2019
+//  Created by Serhiy Butz on 05/24/19.
+//  Copyright © Serhiy Butz 2019
 //  MIT license, see LICENSE file for details
 //
 

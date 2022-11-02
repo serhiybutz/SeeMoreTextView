@@ -1,11 +1,11 @@
 Pod::Spec.new do |spec|
   spec.name         = 'SeeMoreTextView'
-  spec.version      = '4.1.0'
+  spec.version      = '4.2.0'
   spec.summary      = 'Text view with an expandable See More link'
-  spec.homepage     = 'https://github.com/SergeBouts/SeeMoreTextView'
+  spec.homepage     = 'https://github.com/SerhiyButz/SeeMoreTextView'
   spec.screenshots  = "#{spec.homepage}/blob/master/screenshot.gif"
   spec.license      = { :type => 'MIT', :file => 'LICENSE' }
-  spec.author       = { 'Serge Bouts' => 'sergebouts@gmail.com' }
+  spec.author       = { 'Serhiy Butz' => 'serhiybutz@gmail.com' }
   spec.osx.deployment_target = '10.12'
   spec.ios.deployment_target = '12.0'
   spec.swift_version = '4.2'

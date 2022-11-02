@@ -3,7 +3,7 @@
     <img src="https://img.shields.io/badge/platform-osx|ios-orange" alt="Platform" />
     <img src="https://img.shields.io/badge/Swift%20Package%20Manager-compatible-orange" alt="SPM" />
     <img src="https://img.shields.io/badge/pod-compatible-orange" alt="CocoaPods" />
-    <a href="https://github.com/SergeBouts/SeeMoreTextView/blob/master/LICENSE">
+    <a href="https://github.com/SerhiyButz/SeeMoreTextView/blob/master/LICENSE">
         <img src="https://img.shields.io/badge/licence-MIT-orange" alt="License" />
     </a>
 </p>
@@ -84,11 +84,11 @@ class CustomScrollView: NSScrollView {
 1. Go to "File" -> "Swift Packages" -> "Add Package Dependency"
 2. Paste SeeMoreTextView repository URL into the search field:
 
-`https://github.com/SergeBouts/SeeMoreTextView.git`
+`https://github.com/SerhiyButz/SeeMoreTextView.git`
 
 3. Click "Next"
 
-4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 4.1.0"
+4. Ensure that the "Rules" field is set to something like this: "Version: Up To Next Major: 4.2.0"
 
 5. Click "Next" to finish
 
@@ -105,7 +105,7 @@ platform :osx, '10.12'
 
 target 'YOUR-TARGET' do
   use_frameworks!
-  pod 'SeeMoreTextView', :git => 'https://github.com/SergeBouts/SeeMoreTextView.git'
+  pod 'SeeMoreTextView', :git => 'https://github.com/SerhiyButz/SeeMoreTextView.git'
 end
 ```
 
